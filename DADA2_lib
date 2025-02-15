@@ -1,0 +1,84 @@
+# Load required packages
+library(dada2)
+library(seqinr)
+
+# Define paths
+base_path <- path.expand("~/notebook/r_studio/ENI_2025/DADA2")
+t2s_file <- file.path(base_path, "t2sENI.csv")
+asv_table <- file.path(base_path, "ENI_ASV_table.tsv")
+stats_file <- file.path(base_path, "ENI_filter_stats.tsv")
+
+# Set CPU cores
+cpus <- parallel::detectCores() - 2  # Use all but 2 cores
+
+# Read tag-to-sample file
+t2s <- read.table(t2s_file, header=TRUE, sep=",")
+t2s_name <- sub(".csv", "", basename(t2s_file))
+
+# Determine if one library per sample
+lib_sample <- length(unique(t2s$run)) == length(unique(t2s$sample))
+
+# Define filtering paths
+path.filt <- file.path(base_path, "filterAndTrimed")
+dir.create(path.filt, showWarnings = FALSE)  # Ensure directory exists
+
+# Get FASTQ files
+fwd <- sort(list.files(base_path, pattern = "_fwd.fastq", full.names=TRUE))
+rev <- sort(list.files(base_path, pattern = "_rev.fastq", full.names=TRUE))
+
+# Define file names after filtering
+filtFs <- file.path(path.filt, basename(fwd))
+filtRs <- file.path(path.filt, basename(rev))
+
+# Filter and trim
+filtering <- filterAndTrim(fwd=fwd, rev=rev, filt=filtFs, filt.rev=filtRs, multithread=cpus, verbose=TRUE)
+
+# Remove samples with zero reads
+noReads <- rownames(filtering[filtering$reads.out == 0,])
+withReads <- rownames(filtering[filtering$reads.out > 0,])
+
+# Keep only valid samples
+filtFs_kept <- filtFs[!basename(filtFs) %in% noReads]
+filtRs_kept <- filtRs[!basename(filtRs) %in% noReads]
+t2s_keep <- t2s[t2s$sample %in% withReads,]
+
+message("DADA2: filterAndTrim done.")
+
+# DADA2 processing
+message("DADA2: Learning error model(s) step")
+
+for (i in unique(t2s_keep$sample)) {
+  message(paste("DADA2: Processing sample", i))
+
+  # Get sample-specific files
+  sample_filtFs <- filtFs_kept[grep(paste0(i, "_"), filtFs_kept)]
+  sample_filtRs <- filtRs_kept[grep(paste0(i, "_"), filtRs_kept)]
+
+  # Learn error models
+  set.seed(100)
+  errF <- learnErrors(sample_filtFs, nbases=1e8, multithread=cpus, randomize=TRUE)
+  errR <- learnErrors(sample_filtRs, nbases=1e8, multithread=cpus, randomize=TRUE)
+
+  # Dereplication
+  drpF <- derepFastq(sample_filtFs)
+  drpR <- derepFastq(sample_filtRs)
+
+  # Assign sample names
+  names(drpF) <- i
+  names(drpR) <- i
+
+  # Denoising
+  ddF <- dada(drpF, err=errF, multithread=cpus, pool="pseudo")
+  ddR <- dada(drpR, err=errR, multithread=cpus, pool="pseudo")
+
+  # Merging
+  merger <- mergePairs(ddF, drpF, ddR, drpR, trimOverhang=TRUE)
+  merger <- unique(merger)  # Remove duplicate sequences
+
+  # Save results
+  saveRDS(merger, file.path(base_path, paste0(i, "_merger.rds")))
+
+  message(paste("DADA2: Sample", i, "processing complete."))
+}
+
+message("DADA2 workflow completed successfully.")
