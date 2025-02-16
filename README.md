@@ -28,7 +28,7 @@ cpus: Enables multi-threading for faster processing.
 pool: Uses pseudo-pooling during denoising to improve ASV detection.
 lib_list: Extracts unique sequencing libraries from the metadata to process each library separately.
 
-# Run the DADA2 Pipeline
+# 4. Run the DADA2 Pipeline
 The script calls run_dada2_pipeline(), passing the required parameters.
 This function (from run_dada2.R) performs all processing steps, including:
 Quality filtering and trimming
