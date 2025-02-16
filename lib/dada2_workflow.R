@@ -1,5 +1,5 @@
 # Load the DADA2 processing pipeline function from an external script
-source("run_dada2.R")  # Ensures modularity and reusability
+source("dada2_run.R")  # Ensures modularity and reusability
 
 # Set working directory path
 path <- getwd()  # Gets the current working directory
