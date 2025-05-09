@@ -22,5 +22,10 @@ repseq_file <- file.path(output_dir, "representative_sequences.fasta") # Output 
 cpus <- TRUE  # Enable multi-threading (set actual number if needed)
 pool <- "pseudo"  # DADA2 pooling method for denoising
 
+lib_sample <- FALSE
+by_lib <- TRUE
+lib_list <- unique(t2s$run)
+
+
 # Run the DADA2 pipeline with defined inputs and parameters
 run_dada2_pipeline(path, t2s_file, asv_table, stats_file, cpus = cpus)
